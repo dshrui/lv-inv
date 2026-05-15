@@ -154,6 +154,12 @@ function detectCurrencyInText(value) {
   return match ? normaliseCurrency(match[2]) : "";
 }
 
+function isRateNoteLine(value) {
+  return new RegExp(`\\b(${CURRENCY_PATTERN})\\s*[\\d,]+(?:\\.\\d{1,2})?\\s*/\\s*(?:h|hr|hrs|hour|hours)\\b`, "i").test(
+    String(value || "").trim(),
+  );
+}
+
 function createDescriptionOnlyLine(description) {
   return createServiceLine({
     description,
@@ -196,7 +202,7 @@ function applyQuantityToDescription(description, qty) {
 }
 
 function isVehicleDetailLine(value) {
-  return /^(alphard|vellfire|hiace|innova|starex|estima)$/i.test(String(value || "").trim());
+  return /^(alphard|vellfire|hiace|innova|starex|estima|(?:toyota\s+)?camry)$/i.test(String(value || "").trim());
 }
 
 function formatNumber(value) {
@@ -324,7 +330,7 @@ function parseDepositAdjustmentLine(value) {
 }
 
 function isAmountOrRateLine(value) {
-  return Boolean(parseAmountText(value).amount || parseRateLine(value));
+  return Boolean(parseAmountText(value).amount || parseRateLine(value) || splitDescriptionAndAmount(value).amount);
 }
 
 function splitDescriptionAndAmount(value) {
@@ -431,7 +437,11 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       } else if (label === "email") {
         providedCustomerFields.email = true;
         nextInvoice.email = value;
-      } else if (/^(mobile|phone|tel|telephone)$/.test(label)) {
+      } else if (
+        /^(mobile|mobile no|mobile number|phone|phone no|phone number|tel|telephone|contact|contact no|contact number|whatsapp|whatsapp no|whatsapp number|handphone)$/.test(
+          label,
+        )
+      ) {
         providedCustomerFields.phone = true;
         nextInvoice.phone = value;
       } else if (/^(date|invoice date)$/.test(label)) nextInvoice.invoiceDate = value;
@@ -563,6 +573,16 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       dateGroups.push(currentDateGroup);
     }
 
+    if (isRateNoteLine(line)) {
+      const noteCurrency = detectCurrencyInText(line);
+      if (noteCurrency) detectedCurrency = noteCurrency;
+      currentDateGroup.lines.push(createDescriptionOnlyLine(line));
+      pendingLine = null;
+      lastCompletedLine = null;
+      currentServiceContext = "";
+      return;
+    }
+
     const parsedRateLine = parseRateLine(line, currentServiceContext);
     if (parsedRateLine) {
       const serviceLine = createServiceLine({
@@ -578,6 +598,23 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     }
 
     const parsedLine = splitDescriptionAndAmount(line);
+
+    if (parsedLine.amount && currentServiceContext) {
+      const description = isVehicleDetailLine(parsedLine.description)
+        ? currentServiceContext
+        : [currentServiceContext, parsedLine.description].filter(Boolean).join(" - ");
+      const serviceLine = createServiceLine({
+        description,
+        qty: parsedLine.qty || "1",
+        amount: formatAmount(parsedLine.amount),
+      });
+      currentDateGroup.lines.push(serviceLine);
+      if (parsedLine.currency) detectedCurrency = parsedLine.currency;
+      pendingLine = null;
+      lastCompletedLine = serviceLine;
+      currentServiceContext = "";
+      return;
+    }
 
     if (!parsedLine.amount && nextLineIsAmount) {
       currentServiceContext = normaliseContextDescription(parsedLine.description);
