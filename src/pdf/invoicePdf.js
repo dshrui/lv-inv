@@ -240,6 +240,7 @@ export function createServiceLine(values = {}) {
     isNote: Boolean(values.isNote),
     isRemark: Boolean(values.isRemark),
     isAdjustment: Boolean(values.isAdjustment),
+    isDetail: Boolean(values.isDetail),
   };
 }
 
@@ -353,7 +354,7 @@ function buildTableRows(serviceGroups, font) {
           continue;
         }
 
-        if (isDescriptionOnlyLine(line) && previousLine && !isDescriptionOnlyLine(previousLine)) {
+        if (isDescriptionOnlyLine(line) && previousLine && !isDescriptionOnlyLine(previousLine) && !isDetailLine(line)) {
           rows.push({ type: "spacer" });
         }
 
@@ -484,6 +485,10 @@ function isDescriptionOnlyLine(line) {
 
 function isRemarkLine(line) {
   return Boolean(line.isRemark) || Boolean(line.isNote);
+}
+
+function isDetailLine(line) {
+  return Boolean(line.isDetail);
 }
 
 function isAdjustmentLine(line) {

@@ -170,6 +170,15 @@ function createDescriptionOnlyLine(description) {
   });
 }
 
+function createDetailLine(description) {
+  return createServiceLine({
+    description,
+    qty: "",
+    amount: "",
+    isDetail: true,
+  });
+}
+
 function createAdjustmentLine(description, amount) {
   return createServiceLine({
     description,
@@ -601,13 +610,21 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
 
     if (parsedLine.amount && currentServiceContext) {
       if (isVehicleDetailLine(parsedLine.description)) {
-        currentDateGroup.lines.push(createDescriptionOnlyLine(currentServiceContext));
+        const serviceLine = createServiceLine({
+          description: currentServiceContext,
+          qty: parsedLine.qty || "1",
+          amount: formatAmount(parsedLine.amount),
+        });
+        currentDateGroup.lines.push(serviceLine);
+        currentDateGroup.lines.push(createDetailLine(parsedLine.description));
+        if (parsedLine.currency) detectedCurrency = parsedLine.currency;
+        pendingLine = null;
+        lastCompletedLine = serviceLine;
+        currentServiceContext = "";
+        return;
       }
-      const description = isVehicleDetailLine(parsedLine.description)
-        ? parsedLine.description
-        : [currentServiceContext, parsedLine.description].filter(Boolean).join(" - ");
       const serviceLine = createServiceLine({
-        description,
+        description: [currentServiceContext, parsedLine.description].filter(Boolean).join(" - "),
         qty: parsedLine.qty || "1",
         amount: formatAmount(parsedLine.amount),
       });
