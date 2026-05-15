@@ -451,7 +451,7 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       else if (/^(invoice title|title)$/.test(label)) nextInvoice.invoiceTitle = value;
       else if (/^(service heading|service title|service section|service type)$/.test(label)) explicitServiceHeading = value;
       else if (
-        /^(receipt|receipt no|receipt number|invoice no|invoice number|document no|document number|quotation no|quotation number)$/.test(
+        /^(receipt|receipt no|receipt number|invoice|invoice no|invoice number|inv|inv no|inv number|document no|document number|quotation|quotation no|quotation number)$/.test(
           label,
         )
       ) {
@@ -576,7 +576,7 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     if (isRateNoteLine(line)) {
       const noteCurrency = detectCurrencyInText(line);
       if (noteCurrency) detectedCurrency = noteCurrency;
-      currentDateGroup.lines.push(createDescriptionOnlyLine(line));
+      currentDateGroup.lines.push(createDescriptionOnlyLine(`**${line}`));
       pendingLine = null;
       lastCompletedLine = null;
       currentServiceContext = "";
@@ -600,8 +600,11 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     const parsedLine = splitDescriptionAndAmount(line);
 
     if (parsedLine.amount && currentServiceContext) {
+      if (isVehicleDetailLine(parsedLine.description)) {
+        currentDateGroup.lines.push(createDescriptionOnlyLine(currentServiceContext));
+      }
       const description = isVehicleDetailLine(parsedLine.description)
-        ? currentServiceContext
+        ? parsedLine.description
         : [currentServiceContext, parsedLine.description].filter(Boolean).join(" - ");
       const serviceLine = createServiceLine({
         description,
