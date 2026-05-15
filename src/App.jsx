@@ -319,13 +319,16 @@ Taipei Chauffeur Service 10h 13000 TWD
 Alphard
 
 **Additional hourly rate @ 1500 TWD / hour
-**Inclusive one airport transfer on 13rd and 15th May.`}
+**Inclusive one airport transfer on 13rd and 15th May.
+
+Remark
+For airport arrival, 90 minutes waiting time is included.`}
                 onChange={(event) => setQuickPasteText(event.target.value)}
               />
             </label>
             <p className="mini-instruction">
-              Remarks: start each remark line with <code>**</code> so the generator treats it as a remark and leaves a
-              gap before it.
+              Remarks: start remark lines with <code>**</code>, or add a <code>Remark</code> heading and put the
+              remark text below it. Remarks stay in the Description column with Qty and Amount blank.
             </p>
             <div className="paste-actions">
               <button type="button" className="secondary-button" onClick={applyQuickPaste}>

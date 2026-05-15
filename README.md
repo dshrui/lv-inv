@@ -117,11 +117,11 @@ Alphard
 
 Supported currency inputs include `RM`, `MYR`, `TWD`, `NTD`, `NT$`, and common ISO-style currency codes such as `USD`, `SGD`, `HKD`, `AUD`, `GBP`, `EUR`, `JPY`, `CNY`, `THB`, `IDR`, `PHP`, and `KRW`. Unknown three-letter currency codes are kept as entered.
 
-Lines beginning with `**` are treated as description-only service rows. They appear in the Description column with blank Qty and Amount cells, and they do not affect subtotal or total.
+Lines beginning with `**` are treated as remarks. The `**` is kept in the generated PDF, the text stays inside the Description column only, and the Qty and Amount cells remain blank.
 
-When description-only remark rows follow a paid service row, the PDF leaves one blank table row before the remark block.
+The parser also recognises a `Remark` or `Remarks` heading. Text below that heading is treated as a remark block without adding `**` if the pasted text did not include it.
 
-The web app shows this as a Quick Paste instruction because remarks must include `**` at the front for the generator to recognise them and add the gap.
+When remarks follow a paid service row, the PDF leaves one blank table row before the remark block. Long remark text wraps to the next line at the same font size inside the Description column instead of spilling into Qty or Amount.
 
 Hour-based terms such as `10h`, `10H`, or `10 hours` are kept inside the service description. The Qty column remains the number of services, for example `Taipei Chauffeur Service 10h 13000 TWD` becomes Description `Taipei Chauffeur Service 10H`, Qty `1`, and Amount `TWD 13,000`.
 

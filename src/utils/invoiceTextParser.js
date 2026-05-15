@@ -124,9 +124,7 @@ function parseAmountText(value) {
 }
 
 function cleanDescriptionNote(value) {
-  return String(value || "")
-    .replace(/^\*+\s*/, "")
-    .trim();
+  return String(value || "").trim();
 }
 
 function isRemarkHeading(value) {
@@ -162,6 +160,7 @@ function createDescriptionOnlyLine(description) {
     qty: "",
     amount: "",
     isNote: true,
+    isRemark: true,
   });
 }
 

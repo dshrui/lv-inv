@@ -15,6 +15,9 @@ const emailColor = black;
 const TABLE_ROWS_PER_PAGE = 19;
 const TABLE_DESCRIPTION_MAX_WIDTH = 195;
 const TABLE_TEXT_SIZE = 10;
+const TABLE_ROW_HEIGHT = 20.75;
+const TABLE_DASHED_BOUNDARIES = 17;
+const REMARK_LINE_HEIGHT = 12;
 
 function newItemId() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -235,6 +238,7 @@ export function createServiceLine(values = {}) {
     qty: values.qty ?? "1",
     amount: values.amount || "",
     isNote: Boolean(values.isNote),
+    isRemark: Boolean(values.isRemark),
     isAdjustment: Boolean(values.isAdjustment),
   };
 }
@@ -313,7 +317,42 @@ function buildTableRows(serviceGroups, font) {
       if (dateIndex > 0) rows.push({ type: "spacer" });
       if (date) rows.push({ type: "date", text: date });
       let previousLine = null;
-      dateGroup.lines.forEach((line) => {
+      let lineIndex = 0;
+      while (lineIndex < dateGroup.lines.length) {
+        const line = dateGroup.lines[lineIndex];
+        if (isRemarkLine(line)) {
+          const remarkLines = [];
+
+          while (lineIndex < dateGroup.lines.length && isRemarkLine(dateGroup.lines[lineIndex])) {
+            const noteLine = dateGroup.lines[lineIndex];
+            const descriptionLines = splitTextToWidth(
+              noteLine.description,
+              TABLE_DESCRIPTION_MAX_WIDTH,
+              font,
+              TABLE_TEXT_SIZE,
+            );
+            remarkLines.push(...descriptionLines);
+            previousLine = noteLine;
+            lineIndex += 1;
+          }
+
+          if (remarkLines.length) {
+            if (previousLine && rows.length && rows[rows.length - 1]?.type !== "spacer") {
+              const rowBeforeRemark = rows[rows.length - 1];
+              if (rowBeforeRemark.type === "line" && !isDescriptionOnlyLine(rowBeforeRemark.line)) {
+                rows.push({ type: "spacer" });
+              }
+            }
+
+            rows.push({
+              type: "remark",
+              lines: remarkLines,
+              slots: Math.max(1, Math.ceil((remarkLines.length * REMARK_LINE_HEIGHT + 4) / TABLE_ROW_HEIGHT)),
+            });
+          }
+          continue;
+        }
+
         if (isDescriptionOnlyLine(line) && previousLine && !isDescriptionOnlyLine(previousLine)) {
           rows.push({ type: "spacer" });
         }
@@ -333,17 +372,27 @@ function buildTableRows(serviceGroups, font) {
           });
         });
         previousLine = line;
-      });
+        lineIndex += 1;
+      }
     });
 
     return rows;
   });
 }
 
+function getRowSlots(row) {
+  return row?.slots || 1;
+}
+
+function getRowsSlotCount(rows) {
+  return rows.reduce((sum, row) => sum + getRowSlots(row), 0);
+}
+
 function paginateRows(rows) {
   if (!rows.length) return [[]];
   const pages = [];
   let currentPage = [];
+  let currentPageSlots = 0;
   let index = 0;
 
   function currentPageLimit() {
@@ -354,27 +403,30 @@ function paginateRows(rows) {
     if (currentPage.length) {
       pages.push(currentPage);
       currentPage = [];
+      currentPageSlots = 0;
     }
   }
 
   function pushRow(row) {
     const limit = currentPageLimit();
+    const rowSlots = getRowSlots(row);
 
-    if (row.type === "spacer" && currentPage.length > limit - 3) {
+    if (row.type === "spacer" && currentPageSlots > limit - 3) {
       flushPage();
       return;
     }
 
-    if (row.type === "date" && currentPage.length > limit - 2) {
+    if (row.type === "date" && currentPageSlots > limit - 2) {
       flushPage();
     }
 
-    if (currentPage.length === limit) {
+    if (currentPageSlots > 0 && currentPageSlots + rowSlots > limit) {
       flushPage();
     }
 
-    if (row.type === "spacer" && currentPage.length === 0) return;
+    if (row.type === "spacer" && currentPageSlots === 0) return;
     currentPage.push(row);
+    currentPageSlots += rowSlots;
   }
 
   while (index < rows.length) {
@@ -386,13 +438,16 @@ function paginateRows(rows) {
       let endIndex = index + 1;
       while (endIndex < rows.length && rows[endIndex].type !== "spacer") endIndex += 1;
       const block = rows.slice(index, endIndex);
-      const blockLength = block[0]?.type === "spacer" && currentPage.length === 0 ? block.length - 1 : block.length;
+      const blockLength =
+        block[0]?.type === "spacer" && currentPageSlots === 0
+          ? getRowsSlotCount(block.slice(1))
+          : getRowsSlotCount(block);
       const limit = currentPageLimit();
 
       if (
-        currentPage.length > 0 &&
+        currentPageSlots > 0 &&
         blockLength <= limit &&
-        currentPage.length + blockLength > limit
+        currentPageSlots + blockLength > limit
       ) {
         flushPage();
       }
@@ -425,6 +480,10 @@ export function getInvoiceSubtotal(data) {
 
 function isDescriptionOnlyLine(line) {
   return Boolean(line.isNote) || (!String(line.qty || "").trim() && !String(line.amount || "").trim());
+}
+
+function isRemarkLine(line) {
+  return Boolean(line.isRemark) || Boolean(line.isNote);
 }
 
 function isAdjustmentLine(line) {
@@ -502,13 +561,6 @@ export async function generateInvoicePdf(data) {
   const pageRows = paginateRows(tableRows);
   const repeatedHeading = String(invoiceData.serviceGroups[0]?.heading || "").trim();
 
-  function getRowsSubtotal(rowsForPage) {
-    return rowsForPage.reduce((sum, row) => {
-      if (row.type !== "line" || !row.showValues || isDescriptionOnlyLine(row.line)) return sum;
-      return sum + parseAmount(row.line.amount);
-    }, 0);
-  }
-
   function drawInvoicePage(page, rowsForPage, subtotal, total, includeTotal) {
   page.drawRectangle({ x: 0, y: 0, width: 595.28, height: 841.89, color: white });
   page.drawImage(logo, {
@@ -571,7 +623,6 @@ export async function generateInvoicePdf(data) {
   const currencyX = 468.6769;
   const amountRightX = 534.4619;
   const firstRowY = 580.2609;
-  const rowHeight = 20.75;
   const currency = String(invoiceData.currency || "RM").trim() || "RM";
 
   page.drawRectangle({
@@ -634,20 +685,48 @@ export async function generateInvoicePdf(data) {
     });
   });
 
-  for (let index = 0; index < 17; index += 1) {
-    const y = 573.5959 - index * rowHeight;
-    page.drawLine({
-      start: { x: 192.9853, y },
-      end: { x: tableRightX, y },
-      thickness: 0.75,
-      color: lineGrey,
-      dashArray: [1.5, 1.5],
-    });
+  const boundarySlots = [];
+  let boundarySlotCursor = 0;
+  rowsForPage.forEach((row) => {
+    boundarySlotCursor += getRowSlots(row);
+    if (boundarySlotCursor <= TABLE_DASHED_BOUNDARIES) boundarySlots.push(boundarySlotCursor);
+  });
+  for (let slot = boundarySlotCursor + 1; slot <= TABLE_DASHED_BOUNDARIES; slot += 1) {
+    boundarySlots.push(slot);
   }
 
-  rowsForPage.forEach((row, rowIndex) => {
-    const y = firstRowY - rowIndex * rowHeight;
+  [...new Set(boundarySlots)]
+    .sort((a, b) => a - b)
+    .forEach((slot) => {
+      const y = 573.5959 - (slot - 1) * TABLE_ROW_HEIGHT;
+      page.drawLine({
+        start: { x: 192.9853, y },
+        end: { x: tableRightX, y },
+        thickness: 0.75,
+        color: lineGrey,
+        dashArray: [1.5, 1.5],
+      });
+    });
+
+  let rowSlotCursor = 0;
+  rowsForPage.forEach((row) => {
+    const y = firstRowY - rowSlotCursor * TABLE_ROW_HEIGHT;
+    const rowSlots = getRowSlots(row);
+    rowSlotCursor += rowSlots;
+
     if (row.type === "spacer") return;
+    if (row.type === "remark") {
+      row.lines.forEach((line, lineIndex) => {
+        page.drawText(line || "", {
+          x: tableLeftX,
+          y: y - lineIndex * REMARK_LINE_HEIGHT,
+          size: TABLE_TEXT_SIZE,
+          font: helvetica,
+          color: black,
+        });
+      });
+      return;
+    }
     if (row.type === "heading") {
       drawBoundedText(page, row.text, tableLeftX, y, descMaxWidth, helveticaBold, 10, { minSize: 7 });
       return;
@@ -692,12 +771,11 @@ export async function generateInvoicePdf(data) {
     color: black,
   });
 
-  drawBoundedText(page, "Subtotal", 399.9172, subtotalY, amountDividerX - 399.9172 - 2, helvetica, 10, {
-    minSize: 7,
-  });
-  drawCurrencyAmount(page, subtotal, currency, subtotalY, helvetica, currencyX, amountRightX, { minSize: 7 });
-
   if (includeTotal) {
+    drawBoundedText(page, "Subtotal", 399.9172, subtotalY, amountDividerX - 399.9172 - 2, helvetica, 10, {
+      minSize: 7,
+    });
+    drawCurrencyAmount(page, subtotal, currency, subtotalY, helvetica, currencyX, amountRightX, { minSize: 7 });
     drawBoundedText(page, "Total", 399.9172, totalY, amountDividerX - 399.9172 - 2, helveticaBold, 10, {
       minSize: 7,
     });
@@ -741,7 +819,7 @@ export async function generateInvoicePdf(data) {
     drawInvoicePage(
       page,
       drawableRows,
-      getRowsSubtotal(rowsForPage),
+      invoiceSubtotal,
       invoiceSubtotal,
       pageIndex === pageRows.length - 1,
     );
