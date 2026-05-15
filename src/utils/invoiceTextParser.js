@@ -400,6 +400,12 @@ function inferServiceHeading(explicitHeading) {
 export function parsePastedInvoiceDetails(rawText, currentInvoice) {
   const nextInvoice = normaliseInvoiceData(currentInvoice);
   const unlabelledLines = [];
+  const providedCustomerFields = {
+    companyName: false,
+    customerName: false,
+    email: false,
+    phone: false,
+  };
   let explicitServiceHeading = "";
 
   String(rawText || "")
@@ -416,11 +422,19 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       const label = labelled[1].trim().toLowerCase();
       const value = cleanFieldValue(labelled[2]);
 
-      if (/^(name|customer|customer name)$/.test(label)) nextInvoice.customerName = value;
-      else if (/^(company|company name)$/.test(label)) nextInvoice.companyName = value;
-      else if (label === "email") nextInvoice.email = value;
-      else if (/^(mobile|phone|tel|telephone)$/.test(label)) nextInvoice.phone = value;
-      else if (/^(date|invoice date)$/.test(label)) nextInvoice.invoiceDate = value;
+      if (/^(name|customer|customer name)$/.test(label)) {
+        providedCustomerFields.customerName = true;
+        nextInvoice.customerName = value;
+      } else if (/^(company|company name)$/.test(label)) {
+        providedCustomerFields.companyName = true;
+        nextInvoice.companyName = value;
+      } else if (label === "email") {
+        providedCustomerFields.email = true;
+        nextInvoice.email = value;
+      } else if (/^(mobile|phone|tel|telephone)$/.test(label)) {
+        providedCustomerFields.phone = true;
+        nextInvoice.phone = value;
+      } else if (/^(date|invoice date)$/.test(label)) nextInvoice.invoiceDate = value;
       else if (/^(document label|document type|invoice label|receipt label|type)$/.test(label)) {
         nextInvoice.documentLabel = value || nextInvoice.documentLabel;
       }
@@ -435,6 +449,12 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       } else if (label === "currency") nextInvoice.currency = value || nextInvoice.currency;
       else unlabelledLines.push(line);
     });
+
+  if (Object.values(providedCustomerFields).some(Boolean)) {
+    Object.entries(providedCustomerFields).forEach(([field, wasProvided]) => {
+      if (!wasProvided) nextInvoice[field] = "";
+    });
+  }
 
   const dateGroups = [];
   let currentDateGroup = null;

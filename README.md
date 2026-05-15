@@ -15,6 +15,8 @@ Open the local URL shown by Vite, fill in the invoice details, click `Generate P
 
 You can also paste invoice details into the Quick Paste box, then click `Apply details` to populate the customer and service fields.
 
+When Quick Paste includes customer details, those customer fields are treated as the latest source of truth. If a new pasted invoice has no company name, the company name field is cleared so a previous invoice's company does not carry over.
+
 ## Production Build
 
 ```bash
