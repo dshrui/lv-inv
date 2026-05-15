@@ -76,7 +76,14 @@ const KNOWN_CURRENCY_PARTS = [
 ];
 const KNOWN_CURRENCY_PATTERN = KNOWN_CURRENCY_PARTS.join("|");
 const CURRENCY_PATTERN = [...KNOWN_CURRENCY_PARTS, "[A-Z]{3}"].join("|");
-const QTY_PATTERN = "\\d+(?:\\.\\d+)?\\s*(?:h|hr|hrs|hour|hours|x|pax)?";
+const QTY_PATTERN = "\\d+(?:\\.\\d+)?\\s*(?:h|hr|hrs|hour|hours|x|pax|%)?";
+const DATE_DAY_PATTERN = "\\d{1,2}(?:st|nd|rd|th)?";
+const DATE_MONTH_PATTERN = "[A-Za-z]+";
+const DATE_YEAR_PATTERN = "\\d{4}";
+const DATE_SEPARATOR_PATTERN = "(?:-|\\bto\\b|\\u2013|\\u2014)";
+const SINGLE_DATE_PATTERN = `${DATE_DAY_PATTERN}\\s+${DATE_MONTH_PATTERN}(?:\\s+${DATE_YEAR_PATTERN})?`;
+const SAME_MONTH_DATE_RANGE_PATTERN = `${DATE_DAY_PATTERN}\\s*${DATE_SEPARATOR_PATTERN}\\s*${DATE_DAY_PATTERN}\\s+${DATE_MONTH_PATTERN}(?:\\s+${DATE_YEAR_PATTERN})?`;
+const FULL_DATE_RANGE_PATTERN = `${DATE_DAY_PATTERN}\\s+${DATE_MONTH_PATTERN}(?:\\s+${DATE_YEAR_PATTERN})?\\s*${DATE_SEPARATOR_PATTERN}\\s*${DATE_DAY_PATTERN}\\s+${DATE_MONTH_PATTERN}(?:\\s+${DATE_YEAR_PATTERN})?`;
 
 function cleanFieldValue(value) {
   const trimmed = String(value || "").trim();
@@ -84,7 +91,10 @@ function cleanFieldValue(value) {
 }
 
 function isServiceDateLine(value) {
-  return /^\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+(?:\s+\d{4})?$/i.test(value.trim());
+  return new RegExp(
+    `^(?:${SINGLE_DATE_PATTERN}|${SAME_MONTH_DATE_RANGE_PATTERN}|${FULL_DATE_RANGE_PATTERN})$`,
+    "i",
+  ).test(value.trim());
 }
 
 function normaliseCurrency(value) {
@@ -125,6 +135,19 @@ function parseAmountText(value) {
 
 function cleanDescriptionNote(value) {
   return String(value || "").trim();
+}
+
+function normalisePlainDescriptionLine(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^vehicle\s*:\s*/i, "Vehicle: ")
+    .replace(/\s+,/g, ",")
+    .replace(/,\s*/g, ", ")
+    .replace(/\s+/g, " ");
+}
+
+function isTripInfoInstructionLine(value) {
+  return /^amend\s+(?:trip\s+)?info$/i.test(String(value || "").trim());
 }
 
 function isRemarkHeading(value) {
@@ -176,6 +199,14 @@ function createDetailLine(description) {
     qty: "",
     amount: "",
     isDetail: true,
+  });
+}
+
+function createPlainDescriptionLine(description) {
+  return createServiceLine({
+    description: normalisePlainDescriptionLine(description),
+    qty: "",
+    amount: "",
   });
 }
 
@@ -235,8 +266,9 @@ function parseMultiplierText(value) {
 
   const amountMultiplier = multiplierMatches.reduce((product, match) => product * Number(match[1]), 1);
   const carMatch = multiplierMatches.find((match) => /^cars?$/i.test(match[2] || ""));
+  const dayMatch = multiplierMatches.find((match) => /^days?$/i.test(match[2] || ""));
   const includesDays = multiplierMatches.some((match) => /^days?$/i.test(match[2] || ""));
-  const displayQty = includesDays ? 1 : Number(carMatch?.[1] || multiplierMatches[0][1] || 1);
+  const displayQty = Number(carMatch?.[1] || dayMatch?.[1] || multiplierMatches[0][1] || 1);
 
   return {
     amountMultiplier,
@@ -260,9 +292,9 @@ function createParsedRateLine({ context, detail, currency, rate, multiplierText,
     .trim()
     .replace(/\s*-\s*$/, "");
   const descriptionBase = [cleanedContext, cleanedDetail].filter(Boolean).join(" - ") || cleanedContext || cleanedDetail;
-  const description = multiplierText?.includesDays && !cleanedDetail
-    ? `${descriptionBase} ${normaliseCurrency(currency)}${formatUnitRate(rate)} ${multiplierText.text}`.trim()
-    : descriptionBase;
+  const description =
+    descriptionBase ||
+    `${normaliseCurrency(currency)}${formatUnitRate(rate)} ${multiplierText?.text || ""}`.trim();
   const quantity = qty || multiplierText?.displayQty || 1;
   const amount = Number(String(rate || "0").replace(/,/g, "")) * (multiplierText?.amountMultiplier || quantity);
 
@@ -336,6 +368,33 @@ function parseDepositAdjustmentLine(value) {
     amount: -Number(match[2].replace(/,/g, "")),
     currency: normaliseCurrency(match[1]),
   };
+}
+
+function parsePercentageChargeLine(value) {
+  const trimmed = String(value || "").trim();
+  if (!/%/.test(trimmed) || !/(credit\s*card|card|payment\s*gateway|gateway)/i.test(trimmed)) return null;
+
+  const percentageMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (!percentageMatch) return null;
+
+  return {
+    description: "Credit Card Payment Gateway Charges",
+    qty: `${formatNumber(Number(percentageMatch[1]))}%`,
+    percentage: Number(percentageMatch[1]),
+  };
+}
+
+function getParsedSubtotal(dateGroups) {
+  return dateGroups.reduce(
+    (total, dateGroup) =>
+      total +
+      dateGroup.lines.reduce((lineTotal, line) => {
+        const amount = Number(String(line.amount || "0").replace(/,/g, ""));
+        if (!Number.isFinite(amount) || amount <= 0) return lineTotal;
+        return lineTotal + amount;
+      }, 0),
+    0,
+  );
 }
 
 function isAmountOrRateLine(value) {
@@ -466,6 +525,7 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       ) {
         nextInvoice.receiptNumber = value;
       } else if (label === "currency") nextInvoice.currency = value || nextInvoice.currency;
+      else if (/^(vehicle|car)$/.test(label) && value) unlabelledLines.push(`Vehicle: ${value}`);
       else unlabelledLines.push(line);
     });
 
@@ -494,12 +554,39 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       return;
     }
 
+    if (isTripInfoInstructionLine(line)) {
+      pendingLine = null;
+      lastCompletedLine = null;
+      currentServiceContext = "";
+      return;
+    }
+
     if (isServiceDateLine(line)) {
       isInRemarkSection = false;
       currentDateGroup = { ...createServiceDate({ date: line }), lines: [] };
       dateGroups.push(currentDateGroup);
       pendingLine = null;
       lastCompletedLine = null;
+      currentServiceContext = "";
+      return;
+    }
+
+    const percentageCharge = parsePercentageChargeLine(line);
+    if (percentageCharge) {
+      if (!currentDateGroup) {
+        currentDateGroup = { ...createServiceDate({ date: "" }), lines: [] };
+        dateGroups.push(currentDateGroup);
+      }
+
+      const chargeBase = getParsedSubtotal(dateGroups);
+      const serviceLine = createServiceLine({
+        description: percentageCharge.description,
+        qty: percentageCharge.qty,
+        amount: formatAmount(chargeBase * (percentageCharge.percentage / 100)),
+      });
+      currentDateGroup.lines.push(serviceLine);
+      pendingLine = null;
+      lastCompletedLine = serviceLine;
       currentServiceContext = "";
       return;
     }
@@ -585,7 +672,7 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     if (isRateNoteLine(line)) {
       const noteCurrency = detectCurrencyInText(line);
       if (noteCurrency) detectedCurrency = noteCurrency;
-      currentDateGroup.lines.push(createDescriptionOnlyLine(`**${line}`));
+      currentDateGroup.lines.push(createPlainDescriptionLine(line));
       pendingLine = null;
       lastCompletedLine = null;
       currentServiceContext = "";
@@ -603,6 +690,7 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       if (parsedRateLine.currency) detectedCurrency = parsedRateLine.currency;
       pendingLine = null;
       lastCompletedLine = serviceLine;
+      currentServiceContext = "";
       return;
     }
 
@@ -651,6 +739,13 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
 
     if (!parsedLine.amount && lastCompletedLine) {
       if (isVehicleDetailLine(parsedLine.description)) return;
+      if (/^vehicle\s*:/i.test(parsedLine.description)) {
+        currentDateGroup.lines.push(createPlainDescriptionLine(parsedLine.description));
+        pendingLine = null;
+        lastCompletedLine = null;
+        currentServiceContext = "";
+        return;
+      }
 
       if (nextLineIsAmount) {
         const serviceLine = createServiceLine({
@@ -669,7 +764,11 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     }
 
     if (!parsedLine.amount) {
-      currentDateGroup.lines.push(createDescriptionOnlyLine(parsedLine.description));
+      if (/^vehicle\s*:/i.test(parsedLine.description)) {
+        currentDateGroup.lines.push(createPlainDescriptionLine(parsedLine.description));
+      } else {
+        currentDateGroup.lines.push(createDescriptionOnlyLine(parsedLine.description));
+      }
       pendingLine = null;
       lastCompletedLine = null;
       currentServiceContext = "";
