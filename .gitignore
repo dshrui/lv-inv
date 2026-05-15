@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.DS_Store
+.env
+.env.local
+output/
+tmp/
+__pycache__/
+.venv/
+.codex_tmp/
+/*.pdf
+/*.pages
+/*.xlsx
+
+# Local workflow file kept out of first push because current gh token lacks workflow scope.
+.github/workflows/deploy.yml

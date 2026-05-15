@@ -1,0 +1,15 @@
+{
+  "company_name": "",
+  "customer_name": "Melanie Chalil",
+  "email": "melanie.chalil@gmail.com",
+  "phone": "012-223 6976",
+  "date": "11 May 2026",
+  "invoice_title": "LeVince Chauffeur Service",
+  "receipt_number": "104247",
+  "line_item_title": "Private Chauffeur Service",
+  "service_date": "10th May",
+  "description": "Airport Transfer",
+  "qty": 1,
+  "amount": 140.00,
+  "currency": "RM"
+}
