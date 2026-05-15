@@ -67,6 +67,8 @@ public/templates/levince-invoice-template.pdf
 - Qty and amount per description
 - Quick paste from plain-text invoice details
 
+Rows can also be description-only. Leave Amount blank for remark rows or service description rows that should not affect the subtotal. Qty and Amount are only needed for chargeable rows.
+
 Each service section follows the invoice design:
 
 ```text

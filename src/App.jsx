@@ -408,6 +408,10 @@ For airport arrival, 90 minutes waiting time is included.`}
           </Section>
 
           <Section title="Services">
+            <p className="mini-instruction">
+              Rows with a blank Amount are treated as description-only and will not affect the subtotal. Fill Qty and
+              Amount only for chargeable rows.
+            </p>
             <div className="service-groups">
               {invoice.serviceGroups.map((group, groupIndex) => (
                 <article className="service-group" key={group.id}>

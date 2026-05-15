@@ -235,7 +235,7 @@ export function createServiceLine(values = {}) {
   return {
     id: values.id || newItemId(),
     description: values.description || "",
-    qty: values.qty ?? "1",
+    qty: values.qty ?? "",
     amount: values.amount || "",
     isNote: Boolean(values.isNote),
     isRemark: Boolean(values.isRemark),
@@ -479,7 +479,7 @@ export function getInvoiceSubtotal(data) {
 }
 
 function isDescriptionOnlyLine(line) {
-  return Boolean(line.isNote) || (!String(line.qty || "").trim() && !String(line.amount || "").trim());
+  return Boolean(line.isNote) || Boolean(line.isRemark) || !String(line.amount || "").trim();
 }
 
 function isRemarkLine(line) {

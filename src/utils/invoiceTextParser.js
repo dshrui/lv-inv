@@ -381,7 +381,7 @@ function splitDescriptionAndAmount(value) {
 
   return {
     description: trimmed,
-    qty: "1",
+    qty: "",
     amount: "",
     currency: "",
   };
@@ -551,6 +551,7 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
 
     if (standaloneAmount.amount && pendingLine) {
       pendingLine.amount = formatAmount(standaloneAmount.amount);
+      if (!String(pendingLine.qty || "").trim()) pendingLine.qty = "1";
       if (standaloneAmount.currency) detectedCurrency = standaloneAmount.currency;
       lastCompletedLine = pendingLine;
       pendingLine = null;
@@ -610,9 +611,17 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       return;
     }
 
+    if (!parsedLine.amount) {
+      currentDateGroup.lines.push(createDescriptionOnlyLine(parsedLine.description));
+      pendingLine = null;
+      lastCompletedLine = null;
+      currentServiceContext = "";
+      return;
+    }
+
     const serviceLine = createServiceLine({
       description: parsedLine.description,
-      qty: parsedLine.qty || "1",
+      qty: parsedLine.qty,
       amount: formatAmount(parsedLine.amount),
     });
     currentDateGroup.lines.push(serviceLine);
