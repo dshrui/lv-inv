@@ -91,6 +91,16 @@ function cleanFieldValue(value) {
   return trimmed === "-" ? "" : trimmed;
 }
 
+function isEmailLine(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function isPhoneLine(value) {
+  const trimmed = String(value || "").trim();
+  const digitCount = trimmed.replace(/\D/g, "").length;
+  return digitCount >= 7 && digitCount <= 15 && /^[+()\d\s-]+$/.test(trimmed);
+}
+
 function isServiceDateLine(value) {
   return new RegExp(
     `^(?:${SINGLE_DATE_PATTERN}|${SAME_MONTH_DATE_RANGE_PATTERN}|${FULL_DATE_RANGE_PATTERN})$`,
@@ -280,6 +290,13 @@ function parseMultiplierText(value) {
   };
 }
 
+function getTrailingRateDetail(value) {
+  return String(value || "")
+    .replace(/\bx\s*\d+(?:\.\d+)?(?:\s*[A-Za-z]+)?/gi, "")
+    .replace(/^[\s,/-]+|[\s,/-]+$/g, "")
+    .trim();
+}
+
 function formatUnitRate(value) {
   const parsed = Number(String(value || "0").replace(/,/g, ""));
   if (!Number.isFinite(parsed)) return String(value || "");
@@ -314,9 +331,10 @@ function parseRateLine(value, context = "") {
   );
   if (detailCurrencyRate) {
     const multiplier = parseMultiplierText(detailCurrencyRate[4]);
+    const trailingDetail = getTrailingRateDetail(detailCurrencyRate[4]);
     return createParsedRateLine({
       context,
-      detail: detailCurrencyRate[1],
+      detail: [detailCurrencyRate[1], trailingDetail].filter(Boolean).join(" - "),
       currency: detailCurrencyRate[2],
       rate: detailCurrencyRate[3],
       multiplierText: multiplier,
@@ -331,7 +349,7 @@ function parseRateLine(value, context = "") {
     const multiplier = parseMultiplierText(currencyRate[3]);
     return createParsedRateLine({
       context,
-      detail: "",
+      detail: getTrailingRateDetail(currencyRate[3]),
       currency: currencyRate[1],
       rate: currencyRate[2],
       multiplierText: multiplier,
@@ -346,7 +364,7 @@ function parseRateLine(value, context = "") {
     const multiplier = parseMultiplierText(rateCurrency[3]);
     return createParsedRateLine({
       context,
-      detail: "",
+      detail: getTrailingRateDetail(rateCurrency[3]),
       currency: rateCurrency[2],
       rate: rateCurrency[1],
       multiplierText: multiplier,
@@ -368,6 +386,30 @@ function parseDepositAdjustmentLine(value) {
     description: trimmed,
     amount: -Number(match[2].replace(/,/g, "")),
     currency: normaliseCurrency(match[1]),
+  };
+}
+
+function parseDiscountAdjustmentLine(value) {
+  const trimmed = String(value || "").trim();
+  if (!/^discount\b/i.test(trimmed)) return null;
+
+  const currencyBeforeAmount = trimmed.match(new RegExp(`\\b(${CURRENCY_PATTERN})\\s*([\\d,]+(?:\\.\\d{1,2})?)`, "i"));
+  const amountBeforeCurrency = trimmed.match(new RegExp(`\\b([\\d,]+(?:\\.\\d{1,2})?)\\s*(${CURRENCY_PATTERN})\\b`, "i"));
+  const match = currencyBeforeAmount || amountBeforeCurrency;
+  if (!match) return null;
+
+  const currency = currencyBeforeAmount ? match[1] : match[2];
+  const amount = currencyBeforeAmount ? match[2] : match[1];
+  const description =
+    trimmed
+      .replace(match[0], "")
+      .replace(/\s+/g, " ")
+      .trim() || "Discount";
+
+  return {
+    description,
+    amount: -Number(amount.replace(/,/g, "")),
+    currency: normaliseCurrency(currency),
   };
 }
 
@@ -502,6 +544,79 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     };
   }
 
+  function applyUnlabelledCustomerDetails(lines) {
+    const firstServiceDateIndex = lines.findIndex((line) => isServiceDateLine(line));
+    if (firstServiceDateIndex <= 0) return lines;
+
+    const leadingLines = lines.slice(0, firstServiceDateIndex);
+    const hasContactSignal = leadingLines.some((line) => isEmailLine(line) || isPhoneLine(line));
+    if (!hasContactSignal) return lines;
+
+    const nameCandidates = [];
+    const remainingLeadingLines = [];
+
+    if (!providedCustomerFields.companyName) nextInvoice.companyName = "";
+    if (!providedCustomerFields.customerName) nextInvoice.customerName = "";
+    if (!providedCustomerFields.email) nextInvoice.email = "";
+    if (!providedCustomerFields.phone) nextInvoice.phone = "";
+
+    leadingLines.forEach((line) => {
+      const cleaned = cleanFieldValue(line);
+      if (!cleaned) return;
+
+      if (isEmailLine(cleaned)) {
+        if (!providedCustomerFields.email) {
+          nextInvoice.email = cleaned;
+          setHeaderLabel("email", DEFAULT_HEADER_LABELS.email);
+        }
+        return;
+      }
+
+      if (isPhoneLine(cleaned)) {
+        if (!providedCustomerFields.phone) {
+          nextInvoice.phone = cleaned;
+          setHeaderLabel("phone", DEFAULT_HEADER_LABELS.phone);
+        }
+        return;
+      }
+
+      if (!isAmountOrRateLine(cleaned) && !isRemarkHeading(cleaned) && !/^vehicle\s*:/i.test(cleaned)) {
+        nameCandidates.push(cleaned);
+        return;
+      }
+
+      remainingLeadingLines.push(line);
+    });
+
+    if (nameCandidates.length === 1 && !providedCustomerFields.customerName) {
+      nextInvoice.customerName = nameCandidates[0];
+      setHeaderLabel("customerName", DEFAULT_HEADER_LABELS.customerName);
+    } else if (nameCandidates.length > 1) {
+      if (!providedCustomerFields.companyName) {
+        nextInvoice.companyName = nameCandidates[0];
+        setHeaderLabel("companyName", DEFAULT_HEADER_LABELS.companyName);
+      }
+      if (!providedCustomerFields.customerName) {
+        nextInvoice.customerName = nameCandidates[1];
+        setHeaderLabel("customerName", DEFAULT_HEADER_LABELS.customerName);
+      }
+      remainingLeadingLines.push(...nameCandidates.slice(2));
+    }
+
+    return [...remainingLeadingLines, ...lines.slice(firstServiceDateIndex)];
+  }
+
+  function hasCustomerDisplayContext() {
+    return Boolean(
+      String(nextInvoice.companyName || "").trim() ||
+        String(nextInvoice.email || "").trim() ||
+        String(nextInvoice.phone || "").trim() ||
+        fallbackCustomerFields.licenseNumber ||
+        fallbackCustomerFields.address ||
+        Object.values(providedCustomerFields).some(Boolean),
+    );
+  }
+
   String(rawText || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -591,6 +706,12 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     nextInvoice.phone = "-";
   }
 
+  const serviceInputLines = applyUnlabelledCustomerDetails(unlabelledLines);
+  if (!String(nextInvoice.customerName || "").trim() && hasCustomerDisplayContext()) {
+    setHeaderLabel("customerName", DEFAULT_HEADER_LABELS.customerName);
+    nextInvoice.customerName = "-";
+  }
+
   const dateGroups = [];
   let currentDateGroup = null;
   let pendingLine = null;
@@ -599,10 +720,10 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
   let isInRemarkSection = false;
   let currentServiceContext = "";
 
-  unlabelledLines.forEach((line, index) => {
+  serviceInputLines.forEach((line, index) => {
     const standaloneAmount = parseAmountText(line);
-    const nextStandaloneAmount = parseAmountText(unlabelledLines[index + 1] || "");
-    const nextLineIsAmount = Boolean(nextStandaloneAmount.amount || isAmountOrRateLine(unlabelledLines[index + 1]));
+    const nextStandaloneAmount = parseAmountText(serviceInputLines[index + 1] || "");
+    const nextLineIsAmount = Boolean(nextStandaloneAmount.amount || isAmountOrRateLine(serviceInputLines[index + 1]));
 
     if (isSeparatorLine(line) || isDailySubtotalLine(line)) {
       pendingLine = null;
@@ -643,6 +764,21 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       currentDateGroup.lines.push(serviceLine);
       pendingLine = null;
       lastCompletedLine = serviceLine;
+      currentServiceContext = "";
+      return;
+    }
+
+    const discountAdjustment = parseDiscountAdjustmentLine(line);
+    if (discountAdjustment) {
+      if (!currentDateGroup) {
+        currentDateGroup = { ...createServiceDate({ date: "" }), lines: [] };
+        dateGroups.push(currentDateGroup);
+      }
+
+      currentDateGroup.lines.push(createAdjustmentLine(discountAdjustment.description, discountAdjustment.amount));
+      if (discountAdjustment.currency) detectedCurrency = discountAdjustment.currency;
+      pendingLine = null;
+      lastCompletedLine = null;
       currentServiceContext = "";
       return;
     }
@@ -723,6 +859,14 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     if (!currentDateGroup) {
       currentDateGroup = { ...createServiceDate({ date: "" }), lines: [] };
       dateGroups.push(currentDateGroup);
+    }
+
+    if (/^vehicle\s*:/i.test(line)) {
+      currentDateGroup.lines.push(createPlainDescriptionLine(line));
+      pendingLine = null;
+      lastCompletedLine = null;
+      currentServiceContext = "";
+      return;
     }
 
     if (isRateNoteLine(line)) {
