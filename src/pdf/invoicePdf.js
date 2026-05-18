@@ -19,6 +19,15 @@ const TABLE_ROW_HEIGHT = 20.75;
 const TABLE_DASHED_BOUNDARIES = 17;
 const REMARK_LINE_HEIGHT = 12;
 
+export const DEFAULT_HEADER_LABELS = {
+  companyName: "COMPANY NAME",
+  customerName: "CUSTOMER NAME",
+  email: "EMAIL",
+  phone: "PHONE",
+  invoiceDate: "DATE",
+  invoiceTitle: "INVOICE TITLE",
+};
+
 function newItemId() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -139,6 +148,29 @@ function drawBoundedText(page, text, x, y, maxWidth, font, size, options = {}) {
   return fitted;
 }
 
+function drawWrappedText(page, text, x, y, maxWidth, font, size, options = {}) {
+  const color = options.color ?? black;
+  const lineHeight = options.lineHeight ?? size + 2;
+  const maxLines = options.maxLines ?? Number.POSITIVE_INFINITY;
+  const lines = splitTextToWidth(text, maxWidth, font, size);
+  const hasLineLimit = Number.isFinite(maxLines);
+  const visibleLines =
+    hasLineLimit && lines.length > maxLines
+      ? [...lines.slice(0, maxLines - 1), lines.slice(maxLines - 1).join(" ")]
+      : lines;
+
+  visibleLines.forEach((line, index) => {
+    const isLimitedLastLine = hasLineLimit && lines.length > maxLines && index === visibleLines.length - 1;
+    const lineText = isLimitedLastLine
+      ? fitTextToWidth(line, maxWidth, font, size, { minSize: size }).text
+      : line;
+    if (!lineText) return;
+    page.drawText(lineText, { x, y: y - index * lineHeight, size, font, color });
+  });
+
+  return visibleLines.length || 1;
+}
+
 function drawRightBoundedText(page, text, leftX, rightX, y, font, size, options = {}) {
   const color = options.color ?? black;
   const maxWidth = Math.max(0, rightX - leftX);
@@ -198,6 +230,7 @@ export function defaultInvoiceData() {
     invoiceTitle: "LeVince Chauffeur Service",
     receiptNumber: "104247",
     currency: "RM",
+    headerLabels: { ...DEFAULT_HEADER_LABELS },
     serviceGroups: [
       createServiceGroup({
         heading: "Private Chauffeur Service",
@@ -227,6 +260,7 @@ export function createEmptyInvoiceData() {
     invoiceTitle: "LeVince Chauffeur Service",
     receiptNumber: "",
     currency: "RM",
+    headerLabels: { ...DEFAULT_HEADER_LABELS },
     serviceGroups: [createServiceGroup()],
   };
 }
@@ -299,10 +333,14 @@ function normaliseServiceGroups(data = {}) {
 }
 
 export function normaliseInvoiceData(data = {}) {
-  const { items, serviceDate, serviceHeading, serviceGroups, ...rest } = data || {};
+  const { items, serviceDate, serviceHeading, serviceGroups, headerLabels, ...rest } = data || {};
   return {
     ...createEmptyInvoiceData(),
     ...rest,
+    headerLabels: {
+      ...DEFAULT_HEADER_LABELS,
+      ...(headerLabels || {}),
+    },
     serviceGroups: normaliseServiceGroups({ ...data, items, serviceDate, serviceHeading, serviceGroups }),
   };
 }
@@ -579,28 +617,42 @@ export async function generateInvoicePdf(data) {
   const headerMaxWidth = 325;
   const labelX = 60.69292;
   const colonX = 204.69292;
+  const headerFontSize = 12;
+  const headerLineHeight = 12.5;
+  const headerRowGap = 18.9;
   const headerRows = [
-    ["COMPANY NAME", "companyName", 727.2937],
-    ["CUSTOMER NAME", "customerName", 708.3937],
-    ["EMAIL", "email", 689.4937],
-    ["PHONE", "phone", 670.5937],
-    ["DATE", "invoiceDate", 651.6937],
-    ["INVOICE TITLE", "invoiceTitle", 632.7937],
+    "companyName",
+    "customerName",
+    "email",
+    "phone",
+    "invoiceDate",
+    "invoiceTitle",
   ];
+  let headerY = 727.2937;
 
-  for (const [label, field, y] of headerRows) {
-    page.drawText(label, { x: labelX, y, size: 12, font: helvetica, color: black });
-    page.drawText(":", { x: colonX, y, size: 12, font: helvetica, color: black });
+  for (const field of headerRows) {
+    const label = String(invoiceData.headerLabels?.[field] || DEFAULT_HEADER_LABELS[field] || "")
+      .trim()
+      .toUpperCase();
+    drawBoundedText(page, label, labelX, headerY, colonX - labelX - 8, helvetica, headerFontSize, { minSize: 7 });
+    page.drawText(":", { x: colonX, y: headerY, size: headerFontSize, font: helvetica, color: black });
     const value = String(invoiceData[field] || "").trim();
-    if (!value) continue;
+    let valueLineCount = 1;
     if (field === "email") {
-      drawBoundedText(page, value, headerX, y, headerMaxWidth, helvetica, 12, {
-        color: emailColor,
-        minSize: 7,
+      valueLineCount = value
+        ? drawWrappedText(page, value, headerX, headerY, headerMaxWidth, helvetica, headerFontSize, {
+            color: emailColor,
+            lineHeight: headerLineHeight,
+            maxLines: 2,
+          })
+        : 1;
+    } else if (value) {
+      valueLineCount = drawWrappedText(page, value, headerX, headerY, headerMaxWidth, helvetica, headerFontSize, {
+        lineHeight: headerLineHeight,
+        maxLines: 2,
       });
-    } else {
-      drawBoundedText(page, value, headerX, y, headerMaxWidth, helvetica, 12, { minSize: 7 });
     }
+    headerY -= headerRowGap + Math.max(0, valueLineCount - 1) * headerLineHeight;
   }
 
   drawBoundedText(
