@@ -606,6 +606,17 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     return [...remainingLeadingLines, ...lines.slice(firstServiceDateIndex)];
   }
 
+  function hasCustomerDisplayContext() {
+    return Boolean(
+      String(nextInvoice.companyName || "").trim() ||
+        String(nextInvoice.email || "").trim() ||
+        String(nextInvoice.phone || "").trim() ||
+        fallbackCustomerFields.licenseNumber ||
+        fallbackCustomerFields.address ||
+        Object.values(providedCustomerFields).some(Boolean),
+    );
+  }
+
   String(rawText || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -696,6 +707,11 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
   }
 
   const serviceInputLines = applyUnlabelledCustomerDetails(unlabelledLines);
+  if (!String(nextInvoice.customerName || "").trim() && hasCustomerDisplayContext()) {
+    setHeaderLabel("customerName", DEFAULT_HEADER_LABELS.customerName);
+    nextInvoice.customerName = "-";
+  }
+
   const dateGroups = [];
   let currentDateGroup = null;
   let pendingLine = null;
