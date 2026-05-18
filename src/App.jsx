@@ -13,6 +13,7 @@ import {
   createServiceDate,
   createServiceGroup,
   createServiceLine,
+  DEFAULT_HEADER_LABELS,
   defaultInvoiceData,
   generateInvoicePdf,
   getCurrentInvoiceDate,
@@ -99,6 +100,21 @@ export default function App() {
 
   function updateInvoice(field, value) {
     setInvoice((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateHeaderLabel(field, value) {
+    setInvoice((current) => ({
+      ...current,
+      headerLabels: {
+        ...DEFAULT_HEADER_LABELS,
+        ...(current.headerLabels || {}),
+        [field]: value,
+      },
+    }));
+  }
+
+  function getHeaderLabel(field) {
+    return invoice.headerLabels?.[field] || DEFAULT_HEADER_LABELS[field] || "";
   }
 
   function updateServiceGroup(groupId, field, value) {
@@ -340,44 +356,101 @@ For airport arrival, 90 minutes waiting time is included.`}
           </Section>
 
           <Section title="Customer">
-            <div className="grid two">
-              <Field
-                label="Company name"
-                value={invoice.companyName}
-                placeholder="ABC Logistics Sdn Bhd"
-                onChange={(value) => updateInvoice("companyName", value)}
-              />
-              <Field
-                label="Customer name"
-                value={invoice.customerName}
-                required
-                placeholder="Melanie Chalil"
-                onChange={(value) => updateInvoice("customerName", value)}
-              />
-              <Field
-                label="Email"
-                value={invoice.email}
-                placeholder="customer@email.com"
-                onChange={(value) => updateInvoice("email", value)}
-              />
-              <Field
-                label="Phone"
-                value={invoice.phone}
-                placeholder="012-345 6789"
-                onChange={(value) => updateInvoice("phone", value)}
-              />
+            <div className="particulars-grid">
+              <div className="particular-row">
+                <Field
+                  label="PDF label"
+                  value={getHeaderLabel("companyName")}
+                  placeholder="COMPANY NAME"
+                  onChange={(value) => updateHeaderLabel("companyName", value)}
+                />
+                <Field
+                  label="Company value"
+                  value={invoice.companyName}
+                  placeholder="ABC Logistics Sdn Bhd"
+                  onChange={(value) => updateInvoice("companyName", value)}
+                />
+              </div>
+              <div className="particular-row">
+                <Field
+                  label="PDF label"
+                  value={getHeaderLabel("customerName")}
+                  placeholder="CUSTOMER NAME"
+                  onChange={(value) => updateHeaderLabel("customerName", value)}
+                />
+                <Field
+                  label="Customer value"
+                  value={invoice.customerName}
+                  required
+                  placeholder="Melanie Chalil"
+                  onChange={(value) => updateInvoice("customerName", value)}
+                />
+              </div>
+              <div className="particular-row">
+                <Field
+                  label="PDF label"
+                  value={getHeaderLabel("email")}
+                  placeholder="EMAIL"
+                  onChange={(value) => updateHeaderLabel("email", value)}
+                />
+                <Field
+                  label="Email / address value"
+                  value={invoice.email}
+                  placeholder="customer@email.com"
+                  onChange={(value) => updateInvoice("email", value)}
+                />
+              </div>
+              <div className="particular-row">
+                <Field
+                  label="PDF label"
+                  value={getHeaderLabel("phone")}
+                  placeholder="PHONE"
+                  onChange={(value) => updateHeaderLabel("phone", value)}
+                />
+                <Field
+                  label="Phone value"
+                  value={invoice.phone}
+                  placeholder="012-345 6789"
+                  onChange={(value) => updateInvoice("phone", value)}
+                />
+              </div>
             </div>
           </Section>
 
           <Section title="Invoice">
+            <div className="particulars-grid invoice-particulars">
+              <div className="particular-row">
+                <Field
+                  label="PDF label"
+                  value={getHeaderLabel("invoiceDate")}
+                  placeholder="DATE"
+                  onChange={(value) => updateHeaderLabel("invoiceDate", value)}
+                />
+                <Field
+                  label="Date value"
+                  value={invoice.invoiceDate}
+                  required
+                  placeholder={getCurrentInvoiceDate()}
+                  onChange={(value) => updateInvoice("invoiceDate", value)}
+                />
+              </div>
+              <div className="particular-row">
+                <Field
+                  label="PDF label"
+                  value={getHeaderLabel("invoiceTitle")}
+                  placeholder="INVOICE TITLE"
+                  onChange={(value) => updateHeaderLabel("invoiceTitle", value)}
+                />
+                <Field
+                  label="Invoice title value"
+                  value={invoice.invoiceTitle}
+                  required
+                  placeholder="LeVince Chauffeur Service"
+                  onChange={(value) => updateInvoice("invoiceTitle", value)}
+                />
+              </div>
+            </div>
             <div className="grid two">
-              <Field
-                label="Date"
-                value={invoice.invoiceDate}
-                required
-                placeholder={getCurrentInvoiceDate()}
-                onChange={(value) => updateInvoice("invoiceDate", value)}
-              />
               <Field
                 label="Document label"
                 value={invoice.documentLabel}
@@ -390,13 +463,6 @@ For airport arrival, 90 minutes waiting time is included.`}
                 required
                 placeholder="104247"
                 onChange={(value) => updateInvoice("receiptNumber", value)}
-              />
-              <Field
-                label="Invoice title"
-                value={invoice.invoiceTitle}
-                required
-                placeholder="LeVince Chauffeur Service"
-                onChange={(value) => updateInvoice("invoiceTitle", value)}
               />
               <Field
                 label="Currency"

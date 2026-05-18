@@ -2,6 +2,7 @@ import {
   createServiceDate,
   createServiceGroup,
   createServiceLine,
+  DEFAULT_HEADER_LABELS,
   normaliseInvoiceData,
 } from "../pdf/invoicePdf.js";
 
@@ -480,7 +481,26 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     email: false,
     phone: false,
   };
+  const fallbackCustomerFields = {
+    licenseNumber: "",
+    address: "",
+  };
   let explicitServiceHeading = "";
+  let isCollectingAddress = false;
+
+  function appendAddressLine(value) {
+    const cleaned = cleanFieldValue(value);
+    if (!cleaned) return;
+    fallbackCustomerFields.address = [fallbackCustomerFields.address, cleaned].filter(Boolean).join(" ");
+  }
+
+  function setHeaderLabel(field, label) {
+    nextInvoice.headerLabels = {
+      ...DEFAULT_HEADER_LABELS,
+      ...(nextInvoice.headerLabels || {}),
+      [field]: label,
+    };
+  }
 
   String(rawText || "")
     .split(/\r?\n/)
@@ -488,6 +508,14 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     .filter(Boolean)
     .forEach((line) => {
       const labelled = line.match(/^([^:]+)\s*:\s*(.*)$/);
+      if (isCollectingAddress && !labelled) {
+        if (!isServiceDateLine(line) && !isAmountOrRateLine(line) && !isRemarkHeading(line)) {
+          appendAddressLine(line);
+          return;
+        }
+        isCollectingAddress = false;
+      }
+
       if (!labelled) {
         unlabelledLines.push(line);
         return;
@@ -495,16 +523,20 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
 
       const label = labelled[1].trim().toLowerCase();
       const value = cleanFieldValue(labelled[2]);
+      isCollectingAddress = false;
 
       if (/^(name|customer|customer name)$/.test(label)) {
         providedCustomerFields.customerName = true;
         nextInvoice.customerName = value;
+        setHeaderLabel("customerName", DEFAULT_HEADER_LABELS.customerName);
       } else if (/^(company|company name)$/.test(label)) {
         providedCustomerFields.companyName = true;
         nextInvoice.companyName = value;
+        setHeaderLabel("companyName", DEFAULT_HEADER_LABELS.companyName);
       } else if (label === "email") {
         providedCustomerFields.email = true;
         nextInvoice.email = value;
+        setHeaderLabel("email", DEFAULT_HEADER_LABELS.email);
       } else if (
         /^(mobile|mobile no|mobile number|phone|phone no|phone number|tel|telephone|contact|contact no|contact number|whatsapp|whatsapp no|whatsapp number|handphone)$/.test(
           label,
@@ -512,6 +544,7 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       ) {
         providedCustomerFields.phone = true;
         nextInvoice.phone = value;
+        setHeaderLabel("phone", DEFAULT_HEADER_LABELS.phone);
       } else if (/^(date|invoice date)$/.test(label)) nextInvoice.invoiceDate = value;
       else if (/^(document label|document type|invoice label|receipt label|type)$/.test(label)) {
         nextInvoice.documentLabel = value || nextInvoice.documentLabel;
@@ -525,6 +558,16 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
       ) {
         nextInvoice.receiptNumber = value;
       } else if (label === "currency") nextInvoice.currency = value || nextInvoice.currency;
+      else if (
+        /^(license|licence|license no|licence no|license number|licence number|company license|company licence|company license number|company licence number)$/.test(
+          label,
+        )
+      ) {
+        fallbackCustomerFields.licenseNumber = value;
+      } else if (/^(address|company address|billing address)$/.test(label)) {
+        appendAddressLine(value);
+        if (!value) isCollectingAddress = true;
+      }
       else if (/^(vehicle|car)$/.test(label) && value) unlabelledLines.push(`Vehicle: ${value}`);
       else unlabelledLines.push(line);
     });
@@ -533,6 +576,19 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     Object.entries(providedCustomerFields).forEach(([field, wasProvided]) => {
       if (!wasProvided) nextInvoice[field] = "";
     });
+  }
+
+  if (!String(nextInvoice.customerName || "").trim() && fallbackCustomerFields.licenseNumber) {
+    setHeaderLabel("customerName", "LICENSE NUMBER");
+    nextInvoice.customerName = fallbackCustomerFields.licenseNumber;
+  }
+  if (!String(nextInvoice.email || "").trim() && fallbackCustomerFields.address) {
+    setHeaderLabel("email", "ADDRESS");
+    nextInvoice.email = fallbackCustomerFields.address;
+  }
+  if (!String(nextInvoice.phone || "").trim() && (fallbackCustomerFields.licenseNumber || fallbackCustomerFields.address)) {
+    setHeaderLabel("phone", DEFAULT_HEADER_LABELS.phone);
+    nextInvoice.phone = "-";
   }
 
   const dateGroups = [];

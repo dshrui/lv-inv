@@ -143,6 +143,22 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.particulars-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.particular-row {
+  display: grid;
+  grid-template-columns: minmax(135px, 0.38fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.invoice-particulars {
+  margin-bottom: 14px;
+}
+
 .field {
   display: grid;
   gap: 7px;
@@ -531,6 +547,7 @@ textarea:focus {
   }
 
   .grid.two,
+  .particular-row,
   .service-group-header,
   .service-date-header,
   .line-head,
