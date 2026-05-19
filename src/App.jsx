@@ -24,27 +24,16 @@ import {
 import { parsePastedInvoiceDetails as parseInvoiceTextDetails } from "./utils/invoiceTextParser";
 
 const STORAGE_KEY = "levince-invoice-draft";
-const OLD_DEFAULT_INVOICE_DATE = "11 May 2026";
-
-function isOldSampleDraft(draft) {
-  return (
-    draft.invoiceDate === OLD_DEFAULT_INVOICE_DATE &&
-    draft.customerName === "Melanie Chalil" &&
-    draft.receiptNumber === "104247"
-  );
-}
 
 function readStoredDraft() {
+  const today = getCurrentInvoiceDate();
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return defaultInvoiceData();
+    if (!stored) return { ...defaultInvoiceData(), invoiceDate: today };
     const draft = normaliseInvoiceData(JSON.parse(stored));
-    if (!String(draft.invoiceDate || "").trim() || isOldSampleDraft(draft)) {
-      return { ...draft, invoiceDate: getCurrentInvoiceDate() };
-    }
-    return draft;
+    return { ...draft, invoiceDate: today };
   } catch {
-    return defaultInvoiceData();
+    return { ...defaultInvoiceData(), invoiceDate: today };
   }
 }
 
@@ -274,12 +263,12 @@ export default function App() {
   }
 
   function resetToSample() {
-    setInvoice(defaultInvoiceData());
+    setInvoice({ ...defaultInvoiceData(), invoiceDate: getCurrentInvoiceDate() });
     setError("");
   }
 
   function clearForm() {
-    setInvoice(createEmptyInvoiceData());
+    setInvoice({ ...createEmptyInvoiceData(), invoiceDate: getCurrentInvoiceDate() });
     setError("");
     setQuickPasteStatus("");
   }
