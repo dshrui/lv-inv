@@ -790,10 +790,14 @@ export async function generateInvoicePdf(data) {
     const isDescriptionOnly = isDescriptionOnlyLine(row.line);
     const isAdjustment = isAdjustmentLine(row.line);
     const descriptionLines = Array.isArray(row.lines) && row.lines.length ? row.lines : [row.text || ""];
+    const rowMiddleOffset = ((rowSlots - 1) * TABLE_ROW_HEIGHT) / 2;
+    const descriptionLineOffset = ((descriptionLines.length - 1) * REMARK_LINE_HEIGHT) / 2;
+    const descriptionStartY = y - rowMiddleOffset + descriptionLineOffset;
+    const valueY = y - rowMiddleOffset;
     descriptionLines.forEach((line, lineIndex) => {
       page.drawText(line || "", {
         x: tableLeftX,
-        y: y - lineIndex * REMARK_LINE_HEIGHT,
+        y: descriptionStartY - lineIndex * REMARK_LINE_HEIGHT,
         size: TABLE_TEXT_SIZE,
         font: helvetica,
         color: black,
@@ -801,11 +805,11 @@ export async function generateInvoicePdf(data) {
     });
     if (row.showValues && !isDescriptionOnly) {
       if (!isAdjustment) {
-        drawCenteredBoundedText(page, row.line.qty || "", descDividerX, amountDividerX, y, helvetica, 10, {
+        drawCenteredBoundedText(page, row.line.qty || "", descDividerX, amountDividerX, valueY, helvetica, 10, {
           minSize: 7,
         });
       }
-      drawCurrencyAmount(page, amount, currency, y - 0.0101, helvetica, currencyX, amountRightX, { minSize: 7 });
+      drawCurrencyAmount(page, amount, currency, valueY - 0.0101, helvetica, currencyX, amountRightX, { minSize: 7 });
     }
   });
 
