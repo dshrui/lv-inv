@@ -206,13 +206,6 @@ function drawCurrencyAmount(page, amount, currency, y, font, currencyX, amountRi
   const fontSize = options.size ?? 10;
   const minSize = options.minSize ?? 7;
 
-  if (parsedAmount < 0) {
-    drawRightBoundedText(page, `${currency}${formatMoney(parsedAmount, currency)}`, currencyX, amountRightX, y, font, fontSize, {
-      minSize,
-    });
-    return;
-  }
-
   drawBoundedText(page, currency, currencyX, y, 29, font, fontSize, { minSize });
   drawRightBoundedText(page, formatMoney(parsedAmount, currency), currencyX + 28, amountRightX, y, font, fontSize, {
     minSize,
@@ -402,13 +395,13 @@ function buildTableRows(serviceGroups, font) {
           font,
           TABLE_TEXT_SIZE,
         );
-        descriptionLines.forEach((description, lineIndex) => {
-          rows.push({
-            type: "line",
-            line,
-            text: description,
-            showValues: lineIndex === 0,
-          });
+        rows.push({
+          type: "line",
+          line,
+          lines: descriptionLines,
+          text: descriptionLines[0] || "",
+          showValues: true,
+          slots: Math.max(1, Math.ceil((descriptionLines.length * REMARK_LINE_HEIGHT + 4) / TABLE_ROW_HEIGHT)),
         });
         previousLine = line;
         lineIndex += 1;
@@ -796,7 +789,16 @@ export async function generateInvoicePdf(data) {
     const amount = parseAmount(row.line.amount);
     const isDescriptionOnly = isDescriptionOnlyLine(row.line);
     const isAdjustment = isAdjustmentLine(row.line);
-    page.drawText(row.text || "", { x: tableLeftX, y, size: TABLE_TEXT_SIZE, font: helvetica, color: black });
+    const descriptionLines = Array.isArray(row.lines) && row.lines.length ? row.lines : [row.text || ""];
+    descriptionLines.forEach((line, lineIndex) => {
+      page.drawText(line || "", {
+        x: tableLeftX,
+        y: y - lineIndex * REMARK_LINE_HEIGHT,
+        size: TABLE_TEXT_SIZE,
+        font: helvetica,
+        color: black,
+      });
+    });
     if (row.showValues && !isDescriptionOnly) {
       if (!isAdjustment) {
         drawCenteredBoundedText(page, row.line.qty || "", descDividerX, amountDividerX, y, helvetica, 10, {
