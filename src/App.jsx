@@ -66,6 +66,7 @@ function Section({ title, children }) {
 export default function App() {
   const [invoice, setInvoice] = useState(readStoredDraft);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [generatedBlob, setGeneratedBlob] = useState(null);
   const [filename, setFilename] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
@@ -254,12 +255,44 @@ export default function App() {
       const url = URL.createObjectURL(result.blob);
       lastPreviewUrl.current = url;
       setPreviewUrl(url);
+      setGeneratedBlob(result.blob);
       setFilename(result.filename);
     } catch (generationError) {
       setError(generationError.message || "Unable to generate PDF.");
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  async function handleDownload() {
+    if (!generatedBlob) return;
+
+    const fileName = filename || "Levince Chauffeur.pdf";
+
+    if (typeof File !== "undefined" && navigator.share && navigator.canShare) {
+      const file = new File([generatedBlob], fileName, { type: "application/pdf" });
+      if (navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: fileName.replace(/\.pdf$/i, ""),
+          });
+          return;
+        } catch (shareError) {
+          if (shareError?.name === "AbortError") return;
+        }
+      }
+    }
+
+    const downloadUrl = URL.createObjectURL(generatedBlob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = fileName;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 30000);
   }
 
   function resetToSample() {
@@ -616,10 +649,10 @@ For airport arrival, 90 minutes waiting time is included.`}
               Generate PDF
             </button>
             {previewUrl ? (
-              <a className="download-button" href={previewUrl} download={filename}>
+              <button type="button" className="download-button" onClick={handleDownload}>
                 <Download aria-hidden="true" />
                 Download
-              </a>
+              </button>
             ) : null}
           </div>
         </form>

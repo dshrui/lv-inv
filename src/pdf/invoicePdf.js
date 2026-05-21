@@ -34,9 +34,9 @@ function newItemId() {
 
 function cleanFilename(value) {
   return String(value || "invoice")
-    .replace(/[^a-z0-9 _.-]/gi, "")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
     .trim()
-    .replace(/\s+/g, "_");
+    .replace(/\s+/g, " ");
 }
 
 export function getCurrentInvoiceDate() {
@@ -890,6 +890,6 @@ export async function generateInvoicePdf(data) {
 
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([pdfBytes], { type: "application/pdf" });
-  const filename = `Levince_Chauffeur_${cleanFilename(invoiceData.receiptNumber)}_${cleanFilename(invoiceData.customerName)}.pdf`;
+  const filename = `Levince Chauffeur ${cleanFilename(invoiceData.receiptNumber)}.pdf`;
   return { blob, filename };
 }
