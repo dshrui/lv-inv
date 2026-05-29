@@ -224,6 +224,10 @@ textarea:focus {
   margin-bottom: 8px;
 }
 
+.notes-field {
+  margin-top: 14px;
+}
+
 .mini-instruction {
   margin: 0 0 12px;
   color: var(--muted);

@@ -27,6 +27,17 @@ export const DEFAULT_HEADER_LABELS = {
   invoiceDate: "DATE",
   invoiceTitle: "INVOICE TITLE",
 };
+export const DEFAULT_NOTES_TITLE = "Notes:";
+export const DEFAULT_PAYMENT_NOTES = [
+  "Payments can be made to:",
+  "Name : Vincenology Solution",
+  "Address : 141 Jalan Dato Onn Jaafar 30300 Ipoh Perak",
+  "Bank : Malayan Banking Berhad",
+  "Account Number : 5144-8652-7367",
+  "Bank Holder : Vincenology Solution",
+  "Swift Code : MBBEMYKL",
+].join("\n");
+export const DEFAULT_FOOTER_TEXT = "Vincenology Solution 141 Jalan Dato Onn Jaafar 30300 Ipoh Perak.";
 
 function newItemId() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -212,6 +223,12 @@ function drawCurrencyAmount(page, amount, currency, y, font, currencyX, amountRi
   });
 }
 
+function splitEditableLines(value) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n");
+}
+
 export function defaultInvoiceData() {
   return {
     companyName: "",
@@ -223,6 +240,9 @@ export function defaultInvoiceData() {
     invoiceTitle: "LeVince Chauffeur Service",
     receiptNumber: "104247",
     currency: "RM",
+    notesTitle: DEFAULT_NOTES_TITLE,
+    paymentNotes: DEFAULT_PAYMENT_NOTES,
+    footerText: DEFAULT_FOOTER_TEXT,
     headerLabels: { ...DEFAULT_HEADER_LABELS },
     serviceGroups: [
       createServiceGroup({
@@ -253,6 +273,9 @@ export function createEmptyInvoiceData() {
     invoiceTitle: "LeVince Chauffeur Service",
     receiptNumber: "",
     currency: "RM",
+    notesTitle: DEFAULT_NOTES_TITLE,
+    paymentNotes: DEFAULT_PAYMENT_NOTES,
+    footerText: DEFAULT_FOOTER_TEXT,
     headerLabels: { ...DEFAULT_HEADER_LABELS },
     serviceGroups: [createServiceGroup()],
   };
@@ -845,31 +868,18 @@ export async function generateInvoicePdf(data) {
     drawCurrencyAmount(page, total, currency, totalY, helveticaBold, currencyX, amountRightX, { minSize: 7 });
   }
 
-  page.drawText("Notes:", { x: 60.69292, y: 153.9324, size: 10, font: helveticaBold, color: black });
-  const notes = [
-    "Payments can be made to:",
-    "Name : Vincenology Solution",
-    "Address : 141 Jalan Dato Onn Jaafar 30300 Ipoh Perak",
-    "Bank : Malayan Banking Berhad",
-    "Account Number : 5144-8652-7367",
-    "Bank Holder : Vincenology Solution",
-    "Swift Code : MBBEMYKL",
-  ];
-  notes.forEach((line, index) => {
-    page.drawText(line, {
-      x: 60.69292,
-      y: 130.5904 - index * 12,
-      size: 10,
-      font: helvetica,
-      color: black,
-    });
+  const notesTitle = String(invoiceData.notesTitle || "").trim();
+  if (notesTitle) {
+    drawBoundedText(page, notesTitle, 60.69292, 153.9324, 470, helveticaBold, 10, { minSize: 7 });
+  }
+  let notesY = 130.5904;
+  splitEditableLines(invoiceData.paymentNotes).forEach((line) => {
+    const lineCount = drawWrappedText(page, line, 60.69292, notesY, 470, helvetica, 10, { lineHeight: 12 });
+    notesY -= Math.max(1, lineCount) * 12;
   });
-  page.drawText("Vincenology Solution 141 Jalan Dato Onn Jaafar 30300 Ipoh Perak.", {
-    x: 56.69292,
-    y: 42.51964,
-    size: 9,
-    font: helveticaBold,
+  drawBoundedText(page, invoiceData.footerText, 56.69292, 42.51964, 482, helveticaBold, 9, {
     color: footerGrey,
+    minSize: 7,
   });
   }
 

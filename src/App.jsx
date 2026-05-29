@@ -13,7 +13,10 @@ import {
   createServiceDate,
   createServiceGroup,
   createServiceLine,
+  DEFAULT_FOOTER_TEXT,
   DEFAULT_HEADER_LABELS,
+  DEFAULT_NOTES_TITLE,
+  DEFAULT_PAYMENT_NOTES,
   defaultInvoiceData,
   generateInvoicePdf,
   getCurrentInvoiceDate,
@@ -636,6 +639,31 @@ For airport arrival, 90 minutes waiting time is included.`}
                 {subtotal.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </strong>
             </div>
+          </Section>
+
+          <Section title="Payment Notes">
+            <div className="grid two">
+              <Field
+                label="Notes heading"
+                value={invoice.notesTitle ?? ""}
+                placeholder={DEFAULT_NOTES_TITLE}
+                onChange={(value) => updateInvoice("notesTitle", value)}
+              />
+              <Field
+                label="Footer line"
+                value={invoice.footerText ?? ""}
+                placeholder={DEFAULT_FOOTER_TEXT}
+                onChange={(value) => updateInvoice("footerText", value)}
+              />
+            </div>
+            <label className="field notes-field">
+              <span>Payment note body</span>
+              <textarea
+                value={invoice.paymentNotes ?? ""}
+                placeholder={DEFAULT_PAYMENT_NOTES}
+                onChange={(event) => updateInvoice("paymentNotes", event.target.value)}
+              />
+            </label>
           </Section>
 
           {error ? <p className="error-message">{error}</p> : null}
