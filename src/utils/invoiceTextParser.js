@@ -526,6 +526,20 @@ function inferDocumentLabelFromField(label, fallback = "") {
   return fallback;
 }
 
+function parseStandaloneDocumentNumberLine(value) {
+  const trimmed = String(value || "").trim();
+  const match = trimmed.match(/^(receipt|quotation|invoice|inv)\s*(?:no\.?|number|#)?\s*[:#-]?\s*(.+)$/i);
+  if (!match) return null;
+
+  const receiptNumber = cleanFieldValue(match[2]);
+  if (!receiptNumber || !/\d/.test(receiptNumber)) return null;
+
+  return {
+    documentLabel: inferDocumentLabelFromField(match[1]),
+    receiptNumber,
+  };
+}
+
 export function parsePastedInvoiceDetails(rawText, currentInvoice) {
   const nextInvoice = normaliseInvoiceData(currentInvoice);
   const unlabelledLines = [];
@@ -635,6 +649,14 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     .filter(Boolean)
     .forEach((line) => {
       const labelled = line.match(/^([^:]+)\s*:\s*(.*)$/);
+      const standaloneDocument = labelled ? null : parseStandaloneDocumentNumberLine(line);
+      if (standaloneDocument) {
+        nextInvoice.documentLabel = standaloneDocument.documentLabel;
+        nextInvoice.receiptNumber = standaloneDocument.receiptNumber;
+        isCollectingAddress = false;
+        return;
+      }
+
       if (isCollectingAddress && !labelled) {
         if (!isServiceDateLine(line) && !isAmountOrRateLine(line) && !isRemarkHeading(line)) {
           appendAddressLine(line);
