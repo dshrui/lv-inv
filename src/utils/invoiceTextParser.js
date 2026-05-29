@@ -415,7 +415,12 @@ function parseDiscountAdjustmentLine(value) {
 
 function parsePercentageChargeLine(value) {
   const trimmed = String(value || "").trim();
-  if (!/%/.test(trimmed) || !/(credit\s*card|card|payment\s*gateway|gateway)/i.test(trimmed)) return null;
+  if (!/%/.test(trimmed)) return null;
+
+  const hasChargeContext = /(credit\s*card|card|payment\s*gateway|gateway)/i.test(trimmed);
+  const isBarePercentage = /^\+?\s*\d+(?:\.\d+)?\s*%$/i.test(trimmed);
+  const isTotalPlusPercentage = /^total\s*\+\s*\d+(?:\.\d+)?\s*%$/i.test(trimmed);
+  if (!hasChargeContext && !isBarePercentage && !isTotalPlusPercentage) return null;
 
   const percentageMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*%/);
   if (!percentageMatch) return null;
@@ -512,6 +517,13 @@ function formatAmount(value) {
 
 function inferServiceHeading(explicitHeading) {
   return String(explicitHeading || "").trim() || "Private Chauffeur Service";
+}
+
+function inferDocumentLabelFromField(label, fallback = "") {
+  if (/^receipt\b/i.test(label)) return "RECEIPT";
+  if (/^quotation\b/i.test(label)) return "QUOTATION";
+  if (/^(invoice|inv)\b/i.test(label)) return "INVOICE";
+  return fallback;
 }
 
 export function parsePastedInvoiceDetails(rawText, currentInvoice) {
@@ -662,7 +674,7 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
         setHeaderLabel("phone", DEFAULT_HEADER_LABELS.phone);
       } else if (/^(date|invoice date)$/.test(label)) nextInvoice.invoiceDate = value;
       else if (/^(document label|document type|invoice label|receipt label|type)$/.test(label)) {
-        nextInvoice.documentLabel = value || nextInvoice.documentLabel;
+        nextInvoice.documentLabel = inferDocumentLabelFromField(value) || value || nextInvoice.documentLabel;
       }
       else if (/^(invoice title|title)$/.test(label)) nextInvoice.invoiceTitle = value;
       else if (/^(service heading|service title|service section|service type)$/.test(label)) explicitServiceHeading = value;
@@ -671,6 +683,8 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
           label,
         )
       ) {
+        const inferredDocumentLabel = inferDocumentLabelFromField(label);
+        if (inferredDocumentLabel) nextInvoice.documentLabel = inferredDocumentLabel;
         nextInvoice.receiptNumber = value;
       } else if (label === "currency") nextInvoice.currency = value || nextInvoice.currency;
       else if (
