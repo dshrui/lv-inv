@@ -216,9 +216,11 @@ function drawCurrencyAmount(page, amount, currency, y, font, currencyX, amountRi
   const parsedAmount = parseAmount(amount);
   const fontSize = options.size ?? 10;
   const minSize = options.minSize ?? 7;
+  const currencyGap = options.currencyGap ?? 2;
 
-  drawBoundedText(page, currency, currencyX, y, 29, font, fontSize, { minSize });
-  drawRightBoundedText(page, formatMoney(parsedAmount, currency), currencyX + 28, amountRightX, y, font, fontSize, {
+  const currencyText = drawBoundedText(page, currency, currencyX, y, 29, font, fontSize, { minSize });
+  const amountLeftX = currencyX + currencyText.width + currencyGap;
+  drawRightBoundedText(page, formatMoney(parsedAmount, currency), amountLeftX, amountRightX, y, font, fontSize, {
     minSize,
   });
 }
@@ -693,8 +695,8 @@ export async function generateInvoicePdf(data) {
   const descMaxWidth = TABLE_DESCRIPTION_MAX_WIDTH;
   const descDividerX = 395.5421;
   const amountDividerX = 464.3019;
-  const currencyX = 468.6769;
-  const amountRightX = 534.4619;
+  const currencyX = amountDividerX + 2;
+  const amountRightX = tableRightX - 1.5;
   const firstRowY = 580.2609;
   const currency = String(invoiceData.currency || "RM").trim() || "RM";
 
