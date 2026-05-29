@@ -520,19 +520,19 @@ function inferServiceHeading(explicitHeading) {
 }
 
 function inferDocumentLabelFromField(label, fallback = "") {
-  if (/^receipt\b/i.test(label)) return "RECEIPT";
-  if (/^quotation\b/i.test(label)) return "QUOTATION";
-  if (/^(invoice|inv)\b/i.test(label)) return "INVOICE";
+  if (/^receipts?\b/i.test(label)) return "RECEIPT";
+  if (/^quotations?\b/i.test(label)) return "QUOTATION";
+  if (/^(invoices?|inv)\b/i.test(label)) return "INVOICE";
   return fallback;
 }
 
-function parseStandaloneDocumentNumberLine(value) {
+function parseStandaloneDocumentLine(value) {
   const trimmed = String(value || "").trim();
-  const match = trimmed.match(/^(receipt|quotation|invoice|inv)\s*(?:no\.?|number|#)?\s*[:#-]?\s*(.+)$/i);
+  const match = trimmed.match(/^(receipts?|quotations?|invoices?|inv)\b(?:\s*(?:no\.?|number|#)?\s*[:#-]?\s*(.*))?$/i);
   if (!match) return null;
 
   const receiptNumber = cleanFieldValue(match[2]);
-  if (!receiptNumber || !/\d/.test(receiptNumber)) return null;
+  if (receiptNumber && !/\d/.test(receiptNumber)) return null;
 
   return {
     documentLabel: inferDocumentLabelFromField(match[1]),
@@ -649,10 +649,10 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
     .filter(Boolean)
     .forEach((line) => {
       const labelled = line.match(/^([^:]+)\s*:\s*(.*)$/);
-      const standaloneDocument = labelled ? null : parseStandaloneDocumentNumberLine(line);
+      const standaloneDocument = labelled ? null : parseStandaloneDocumentLine(line);
       if (standaloneDocument) {
         nextInvoice.documentLabel = standaloneDocument.documentLabel;
-        nextInvoice.receiptNumber = standaloneDocument.receiptNumber;
+        if (standaloneDocument.receiptNumber) nextInvoice.receiptNumber = standaloneDocument.receiptNumber;
         isCollectingAddress = false;
         return;
       }
