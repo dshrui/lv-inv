@@ -88,7 +88,8 @@ h2 {
 
 .topbar-actions,
 .generate-bar,
-.line-footer {
+.line-footer,
+.total-editor {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -341,6 +342,27 @@ textarea:focus {
   font-size: 0.95rem;
 }
 
+.total-editor {
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--soft-line);
+}
+
+.total-input {
+  width: min(240px, 100%);
+}
+
+.total-input input {
+  text-align: right;
+}
+
+.total-editor strong {
+  min-width: 190px;
+  text-align: right;
+  font-size: 0.98rem;
+}
+
 .primary-button,
 .download-button,
 .secondary-button,
@@ -591,10 +613,20 @@ textarea:focus {
   }
 
   .line-footer,
+  .total-editor,
   .paste-actions,
   .generate-bar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .total-input {
+    width: 100%;
+  }
+
+  .total-editor strong {
+    min-width: 0;
+    text-align: left;
   }
 
   .primary-button,

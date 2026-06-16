@@ -65,9 +65,12 @@ public/templates/levince-invoice-template.pdf
 - Service dates under each section
 - One or more descriptions under each date
 - Qty and amount per description
+- Editable final total, with the calculated subtotal used automatically when the total field is blank
 - Quick paste from plain-text invoice details
 
 Rows can also be description-only. Leave Amount blank for remark rows or service description rows that should not affect the subtotal. Qty and Amount are only needed for chargeable rows.
+
+Payment Notes can be edited for the current invoice before generating the PDF. These edits are temporary: after a browser refresh, the Notes heading, payment note body, and footer line return to the default bank details.
 
 Each service section follows the invoice design:
 
@@ -129,7 +132,7 @@ When remarks follow a paid service row, the PDF leaves one blank table row befor
 
 Hour-based terms such as `10h`, `10H`, or `10 hours` are kept inside the service description. The Qty column remains the number of services, for example `Taipei Chauffeur Service 10h 13000 TWD` becomes Description `Taipei Chauffeur Service 10H`, Qty `1`, and Amount `TWD 13,000`.
 
-Itemized pasted details such as `Alphard - RM250`, `Starex - RM300 x 2`, or `Starex - RM190 x 4 cars x 2 way` are converted into service rows. Starred daily totals such as `*RM250*` and separator lines are ignored. Deposit paid lines are converted into negative adjustment rows, while final summary lines such as `Total RM34,410` and `Balance RM12,125` are ignored because the PDF calculates the final total itself.
+Itemized pasted details such as `Alphard - RM250`, `Starex - RM300 x 2`, or `Starex - RM190 x 4 cars x 2 way` are converted into service rows. Starred daily totals such as `*RM250*` and separator lines are ignored. Deposit paid lines are converted into negative adjustment rows, while final summary lines such as `Total RM34,410` and `Balance RM12,125` are ignored because the app first calculates the final total from the service rows. The Total value field can then be edited manually before generating the PDF.
 
 ## Legacy Python Generator
 

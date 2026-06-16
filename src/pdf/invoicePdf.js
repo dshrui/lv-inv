@@ -242,6 +242,7 @@ export function defaultInvoiceData() {
     invoiceTitle: "LeVince Chauffeur Service",
     receiptNumber: "104247",
     currency: "RM",
+    totalOverride: "",
     notesTitle: DEFAULT_NOTES_TITLE,
     paymentNotes: DEFAULT_PAYMENT_NOTES,
     footerText: DEFAULT_FOOTER_TEXT,
@@ -275,6 +276,7 @@ export function createEmptyInvoiceData() {
     invoiceTitle: "LeVince Chauffeur Service",
     receiptNumber: "",
     currency: "RM",
+    totalOverride: "",
     notesTitle: DEFAULT_NOTES_TITLE,
     paymentNotes: DEFAULT_PAYMENT_NOTES,
     footerText: DEFAULT_FOOTER_TEXT,
@@ -535,6 +537,12 @@ export function getInvoiceSubtotal(data) {
   );
 }
 
+export function getInvoiceTotal(data) {
+  const invoiceData = normaliseInvoiceData(data);
+  const totalOverride = String(invoiceData.totalOverride || "").trim();
+  return totalOverride ? parseAmount(totalOverride) : getInvoiceSubtotal(invoiceData);
+}
+
 function isDescriptionOnlyLine(line) {
   return Boolean(line.isNote) || Boolean(line.isRemark) || !String(line.amount || "").trim();
 }
@@ -554,6 +562,7 @@ function isAdjustmentLine(line) {
 export function validateInvoice(data) {
   const invoiceData = normaliseInvoiceData(data);
   const missing = [];
+  const totalOverride = String(invoiceData.totalOverride || "").trim();
   if (!String(invoiceData.customerName || "").trim()) missing.push("Customer name");
   if (!String(invoiceData.invoiceDate || "").trim()) missing.push("Date");
   if (!String(invoiceData.invoiceTitle || "").trim()) missing.push("Invoice title");
@@ -601,12 +610,14 @@ export function validateInvoice(data) {
   ) {
     missing.push("Amount");
   }
+  if (totalOverride && parseAmount(totalOverride) <= 0) missing.push("Total");
   return [...new Set(missing)];
 }
 
 export async function generateInvoicePdf(data) {
   const invoiceData = normaliseInvoiceData(data);
   const invoiceSubtotal = getInvoiceSubtotal(invoiceData);
+  const invoiceTotal = getInvoiceTotal(invoiceData);
 
   const logoBytes = await fetch(LOGO_URL).then((response) => {
     if (!response.ok) throw new Error("Unable to load Levince logo asset.");
@@ -895,7 +906,7 @@ export async function generateInvoicePdf(data) {
       page,
       drawableRows,
       invoiceSubtotal,
-      invoiceSubtotal,
+      invoiceTotal,
       pageIndex === pageRows.length - 1,
     );
   });

@@ -21,6 +21,7 @@ import {
   generateInvoicePdf,
   getCurrentInvoiceDate,
   getInvoiceSubtotal,
+  getInvoiceTotal,
   normaliseInvoiceData,
   validateInvoice,
 } from "./pdf/invoicePdf";
@@ -28,13 +29,26 @@ import { parsePastedInvoiceDetails as parseInvoiceTextDetails } from "./utils/in
 
 const STORAGE_KEY = "levince-invoice-draft";
 
+function formatAmount(value) {
+  return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function withDefaultPaymentNotes(invoice) {
+  return {
+    ...invoice,
+    notesTitle: DEFAULT_NOTES_TITLE,
+    paymentNotes: DEFAULT_PAYMENT_NOTES,
+    footerText: DEFAULT_FOOTER_TEXT,
+  };
+}
+
 function readStoredDraft() {
   const today = getCurrentInvoiceDate();
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return { ...defaultInvoiceData(), invoiceDate: today };
     const draft = normaliseInvoiceData(JSON.parse(stored));
-    return { ...draft, invoiceDate: today };
+    return withDefaultPaymentNotes({ ...draft, invoiceDate: today });
   } catch {
     return { ...defaultInvoiceData(), invoiceDate: today };
   }
@@ -79,6 +93,7 @@ export default function App() {
 
   const missingFields = useMemo(() => validateInvoice(invoice), [invoice]);
   const subtotal = useMemo(() => getInvoiceSubtotal(invoice), [invoice]);
+  const total = useMemo(() => getInvoiceTotal(invoice), [invoice]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(invoice));
@@ -636,7 +651,21 @@ For airport arrival, 90 minutes waiting time is included.`}
               </button>
               <strong>
                 Subtotal: {invoice.currency || "RM"}{" "}
-                {subtotal.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatAmount(subtotal)}
+              </strong>
+            </div>
+            <div className="total-editor">
+              <label className="field total-input">
+                <span>Total value</span>
+                <input
+                  value={invoice.totalOverride ?? ""}
+                  inputMode="decimal"
+                  placeholder={formatAmount(subtotal)}
+                  onChange={(event) => updateInvoice("totalOverride", event.target.value)}
+                />
+              </label>
+              <strong>
+                Final total: {invoice.currency || "RM"} {formatAmount(total)}
               </strong>
             </div>
           </Section>

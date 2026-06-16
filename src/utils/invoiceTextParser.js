@@ -427,7 +427,7 @@ function parsePercentageChargeLine(value) {
 
   return {
     description: "Credit Card Payment Gateway Charges",
-    qty: `${formatNumber(Number(percentageMatch[1]))}%`,
+    qty: "",
     percentage: Number(percentageMatch[1]),
   };
 }
@@ -542,6 +542,7 @@ function parseStandaloneDocumentLine(value) {
 
 export function parsePastedInvoiceDetails(rawText, currentInvoice) {
   const nextInvoice = normaliseInvoiceData(currentInvoice);
+  nextInvoice.totalOverride = "";
   const unlabelledLines = [];
   const providedCustomerFields = {
     companyName: false,
@@ -796,6 +797,7 @@ export function parsePastedInvoiceDetails(rawText, currentInvoice) {
         description: percentageCharge.description,
         qty: percentageCharge.qty,
         amount: formatAmount(chargeBase * (percentageCharge.percentage / 100)),
+        isAdjustment: true,
       });
       currentDateGroup.lines.push(serviceLine);
       pendingLine = null;
